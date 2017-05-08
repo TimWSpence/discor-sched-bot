@@ -1,3 +1,4 @@
 - persist to disk
 - change UUIDs to itegers - more usable
 - separate different channels/servers
+- fix bug !sched create event "name with whitespace" 2017-06-27 14:00
