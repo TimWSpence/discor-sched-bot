@@ -18,6 +18,11 @@ Example usage
 Installation
 ------------
 
+### Prerequisites
+1. The required version of Ruby installed (currently 2.3.0). If you do not have Ruby installed, I thoroughly recommend [RVM](https://rvm.io/rvm/install)
+2. [Bundler](http://bundler.io/) can then be installed via: ```gem install bundler```
+
+### Installing sched bot
 ```
 bundle install
 ruby bot.rb
