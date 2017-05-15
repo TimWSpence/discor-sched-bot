@@ -1,7 +1,6 @@
 require 'discordrb'
 require 'fileutils'
 require 'pathname'
-require 'securerandom'
 require 'time'
 
 $command_prefix = :sched
@@ -46,6 +45,12 @@ class ServerEventStore
     else
       current.values.map(&:print_pretty).join("\n")
     end
+  end
+
+  def generate_id(channel)
+    current_ids = _retrieve(channel).keys
+    id = (0..Float::INFINITY).lazy.drop_while{ |i| current_ids.include?(i.to_s) }.first
+    id.to_s
   end
 
   private
@@ -129,13 +134,13 @@ class User
 end
 
 def handle_create(event, args)
-  id = SecureRandom.uuid
   name = args[1]
   time = Time.parse(args[2..-1].join(' '))
   if time < Time.now
     event.respond "Cannot create an event in the past"
   else
     store = ServerEventStore.new($base_dir, event.server.name)
+    id = store.generate_id(event.channel.name)
     store.store(event.channel.name, id, Event.new(id, name, time))
     event.respond "New event #{name} scheduled for #{time}"
   end
