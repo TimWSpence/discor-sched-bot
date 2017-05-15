@@ -1,6 +1,5 @@
 require 'discordrb'
 require 'fileutils'
-require 'json'
 require 'pathname'
 require 'securerandom'
 require 'time'
@@ -29,18 +28,31 @@ class ServerEventStore
     end
   end
 
+  def list(channel)
+    current = _retrieve(channel)
+    current.delete_if { |key, value| value.time < Time.now }
+    _store(channel, current)
+    if current.empty?
+      "There are no events currently scheduled"
+    else
+      current.values.map(&:print_pretty).join("\n")
+    end
+  end
+
   private
   def _retrieve(channel)
     begin
-      JSON.parse(File.read(@data_dir.join("#{channel}.json"), 'r'))
-    rescue
+      content = File.read(@data_dir.join(channel))
+      Marshal.load(content)
+    rescue => e
+      puts "Error is #{e}"
       {}
     end
   end
 
   def _store(channel, events)
-    File.open(@data_dir.join("#{channel}.json"), 'w') do |f|
-      f.write(JSON.dump(events))
+    File.open(@data_dir.join(channel), "wb") do |f|
+      f.write(Marshal.dump(events))
     end
   end
 
@@ -61,7 +73,7 @@ class Event
     @maybe = []
   end
 
-  def to_s
+  def print_pretty
     "#{@id}: #{@name} scheduled for #{@time}"
   end
 
@@ -111,12 +123,15 @@ def handle_create(event, args)
 end
 
 def handle_list(event, args)
-  $store.delete_if { |key, value| value.time < Time.now }
-  if $store.empty?
-    event.respond "There are no events currently scheduled"
-  else
-    event.respond $store.values.join("\n")
-  end
+
+  #store = ServerEventStore.new(Pathname.new(".data"), event.server.name)
+  event.respond $newstore.list(event.channel.name)
+  # $store.delete_if { |key, value| value.time < Time.now }
+  # if $store.empty?
+  #   event.respond "There are no events currently scheduled"
+  # else
+  #   event.respond $store.values.join("\n")
+  # end
 end
 
 def handle_yes(event, args)
@@ -187,7 +202,7 @@ end
 $newstore = ServerEventStore.new(Pathname.new(".data"), "Bot-test")
 
 def main()
-  bot = Discordrb::Commands::CommandBot.new token: 'MzExMDgzMzIxOTk0MjQ4MTky.C_HYZg.BPNJGDd5FYI72yxtgn3ClV7mcmM', client_id: 311083321994248192, prefix: '!'
+  bot = Discordrb::Commands::CommandBot.new token: '', client_id: 311083321994248192, prefix: '!'
 
   puts "This bot's invite URL is #{bot.invite_url}."
   puts 'Click on it to invite it to your server.'
