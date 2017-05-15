@@ -5,12 +5,14 @@ require 'securerandom'
 require 'time'
 
 $command_prefix = :sched
-$store = {}
 
 class ServerEventStore
 
   def initialize(data_dir, server)
     @data_dir = data_dir.join(server)
+    if !File.exist?(@data_dir)
+      FileUtils.mkdir_p(@data_dir)
+    end
   end
 
   def store(channel, id, event)
@@ -26,6 +28,12 @@ class ServerEventStore
     else
       nil
     end
+  end
+
+  def delete(channel, id)
+    current = _retrieve(channel)
+    current.delete(id)
+    _store(channel, current)
   end
 
   def list(channel)
@@ -79,25 +87,25 @@ class Event
 
   def responses
     <<~EOF
-Yes: #{@accepted.map(&:username).join(', ')}
-No: #{@declined.map(&:username).join(', ')}
-Maybe: #{@maybe.map(&:username).join(', ')}
+Yes: #{@accepted.map(&:name).join(', ')}
+No: #{@declined.map(&:name).join(', ')}
+Maybe: #{@maybe.map(&:name).join(', ')}
     EOF
   end
 
   def accept(user)
     remove_user_from_lists(user)
-    @accepted.push(user)
+    @accepted.push(User.new(user.id, user.username))
   end
 
   def decline(user)
     remove_user_from_lists(user)
-    @declined.push(user)
+    @declined.push(User.new(user.id, user.username))
   end
 
   def maybe(user)
     remove_user_from_lists(user)
-    @maybe.push(user)
+    @maybe.push(User.new(user.id, user.username))
   end
 
   private
@@ -109,6 +117,16 @@ Maybe: #{@maybe.map(&:username).join(', ')}
 
 end
 
+class User
+
+  attr_reader :id, :name
+
+  def initialize(id, name)
+    @id = id
+    @name = name
+  end
+end
+
 def handle_create(event, args)
   id = SecureRandom.uuid
   name = args[1]
@@ -116,27 +134,19 @@ def handle_create(event, args)
   if time < Time.now
     event.respond "Cannot create an event in the past"
   else
-    $store[id] = Event.new(id, name, time)
     $newstore.store(event.channel.name, id, Event.new(id, name, time))
     event.respond "New event #{name} scheduled for #{time}"
   end
 end
 
 def handle_list(event, args)
-
-  #store = ServerEventStore.new(Pathname.new(".data"), event.server.name)
   event.respond $newstore.list(event.channel.name)
-  # $store.delete_if { |key, value| value.time < Time.now }
-  # if $store.empty?
-  #   event.respond "There are no events currently scheduled"
-  # else
-  #   event.respond $store.values.join("\n")
-  # end
 end
 
 def handle_yes(event, args)
   handle_missing(event, args) do |scheduled|
     scheduled.accept(event.user)
+    $newstore.store(event.channel.name, scheduled.id, scheduled)
     nil
   end
 end
@@ -144,6 +154,7 @@ end
 def handle_no(event, args)
   handle_missing(event, args) do |scheduled|
     scheduled.decline(event.user)
+    $newstore.store(event.channel.name, scheduled.id, scheduled)
     nil
   end
 end
@@ -151,26 +162,28 @@ end
 def handle_maybe(event, args)
   handle_missing(event, args) do |scheduled|
     scheduled.maybe(event.user)
+    $newstore.store(event.channel.name, scheduled.id, scheduled)
     nil
   end
 end
 
 def handle_delete(event, args)
   handle_missing(event, args) do |scheduled|
-    $store.delete(scheduled.id)
+    $newstore.delete(event.channel.name, scheduled.id)
     nil
   end
 end
 
 def handle_responses(event, args)
   handle_missing(event, args) do |scheduled|
+    puts "Responses for event: #{scheduled}"
     scheduled.responses
   end
 end
 
 def handle_missing(event, args, &block)
   event_id = args[1]
-  scheduled = $store[event_id]
+  scheduled = $newstore.retrieve(event.channel.name, event_id)
   if scheduled
     event.respond block[scheduled]
   else
