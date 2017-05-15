@@ -4,7 +4,6 @@ require 'pathname'
 require 'time'
 require 'yaml'
 
-$command_prefix = :sched
 $base_dir = Pathname.new(".data")
 
 class ServerEventStore
@@ -202,7 +201,7 @@ end
 
 def handle_help(event, args)
   event.respond <<~EOF
-Usage: !#{$command_prefix} <COMMAND> <ARGS>
+Usage: !#{$keyword} <COMMAND> <ARGS>
 where <COMMAND> one of:
 list
   list all registered future events
@@ -228,14 +227,14 @@ end
 def main()
   config = load_config()
 
-  bot = Discordrb::Commands::CommandBot.new token: config["token"], client_id: config["client_id"], prefix: '!'
+  bot = Discordrb::Commands::CommandBot.new token: config["authorization"]["token"], client_id: config["authorization"]["client_id"], prefix: '!'
 
   puts "This bot's invite URL is #{bot.invite_url}."
   puts 'Click on it to invite it to your server.'
 
   FileUtils.mkdir_p('.data')
 
-  bot.command $command_prefix do |event, *args|
+  bot.command config["keyword"].to_sym do |event, *args|
     puts args
     case args.first
     when 'create'
