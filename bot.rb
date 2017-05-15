@@ -1,9 +1,52 @@
 require 'discordrb'
+require 'fileutils'
+require 'json'
+require 'pathname'
 require 'securerandom'
 require 'time'
 
 $command_prefix = :sched
 $store = {}
+
+class ServerEventStore
+
+  def initialize(data_dir, server)
+    @data_dir = data_dir.join(server)
+  end
+
+  def store(channel, id, event)
+    current = _retrieve(channel)
+    current[id] = event
+    _store(channel, current)
+  end
+
+  def retrieve(channel, id)
+    current = _retrieve(channel)
+    if current
+      current[id]
+    else
+      nil
+    end
+  end
+
+  private
+  def _retrieve(channel)
+    begin
+      JSON.parse(File.read(@data_dir.join("#{channel}.json"), 'r'))
+    rescue
+      {}
+    end
+  end
+
+  def _store(channel, events)
+    File.open(@data_dir.join("#{channel}.json"), 'w') do |f|
+      f.write(JSON.dump(events))
+    end
+  end
+
+end
+
+
 
 class Event
 
@@ -62,6 +105,7 @@ def handle_create(event, args)
     event.respond "Cannot create an event in the past"
   else
     $store[id] = Event.new(id, name, time)
+    $newstore.store(event.channel.name, id, Event.new(id, name, time))
     event.respond "New event #{name} scheduled for #{time}"
   end
 end
@@ -140,31 +184,41 @@ responses
   EOF
 end
 
-bot = Discordrb::Commands::CommandBot.new token: '', client_id: 1, prefix: '!'
+$newstore = ServerEventStore.new(Pathname.new(".data"), "Bot-test")
 
-puts "This bot's invite URL is #{bot.invite_url}."
-puts 'Click on it to invite it to your server.'
+def main()
+  bot = Discordrb::Commands::CommandBot.new token: 'MzExMDgzMzIxOTk0MjQ4MTky.C_HYZg.BPNJGDd5FYI72yxtgn3ClV7mcmM', client_id: 311083321994248192, prefix: '!'
 
-bot.command $command_prefix do |event, *args|
-  case args.first
-  when 'create'
-    handle_create(event, args)
-  when 'delete'
-    handle_delete(event, args)
-  when 'list'
-    handle_list(event, args)
-  when /accept|yes/
-    handle_yes(event, args)
-  when /decline|no/
-    handle_no(event, args)
-  when 'maybe'
-    handle_maybe(event, args)
-  when 'help'
-    handle_help(event, args)
-  when 'responses'
-    handle_responses(event, args)
-  else event.respond "Command not recognised"
+  puts "This bot's invite URL is #{bot.invite_url}."
+  puts 'Click on it to invite it to your server.'
+
+  FileUtils.mkdir_p('.data')
+
+  bot.command $command_prefix do |event, *args|
+    puts args
+    case args.first
+    when 'create'
+      handle_create(event, args)
+    when 'delete'
+      handle_delete(event, args)
+    when 'list'
+      handle_list(event, args)
+    when /accept|yes/
+      handle_yes(event, args)
+    when /decline|no/
+      handle_no(event, args)
+    when 'maybe'
+      handle_maybe(event, args)
+    when 'help'
+      handle_help(event, args)
+    when 'responses'
+      handle_responses(event, args)
+    else event.respond "Command not recognised"
+    end
   end
+
+  bot.run
+
 end
 
-bot.run
+main()
