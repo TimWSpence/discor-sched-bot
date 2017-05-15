@@ -1,3 +1,5 @@
 - fix bug !sched create event "name with whitespace" 2017-06-27 14:00
 - config file for token and client id
 - logging
+- support for repeat events
+- time zone support (display events in given time zone)
