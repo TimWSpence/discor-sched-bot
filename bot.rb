@@ -2,6 +2,7 @@ require 'discordrb'
 require 'fileutils'
 require 'pathname'
 require 'time'
+require 'yaml'
 
 $command_prefix = :sched
 $base_dir = Pathname.new(".data")
@@ -220,10 +221,14 @@ responses
   EOF
 end
 
-$newstore = ServerEventStore.new(Pathname.new(".data"), "Bot-test")
+def load_config()
+  YAML.load(File.read("config.yml"))
+end
 
 def main()
-  bot = Discordrb::Commands::CommandBot.new token: '', client_id: 311083321994248192, prefix: '!'
+  config = load_config()
+
+  bot = Discordrb::Commands::CommandBot.new token: config["token"], client_id: config["client_id"], prefix: '!'
 
   puts "This bot's invite URL is #{bot.invite_url}."
   puts 'Click on it to invite it to your server.'
