@@ -5,6 +5,7 @@ require 'securerandom'
 require 'time'
 
 $command_prefix = :sched
+$base_dir = Pathname.new(".data")
 
 class ServerEventStore
 
@@ -134,58 +135,60 @@ def handle_create(event, args)
   if time < Time.now
     event.respond "Cannot create an event in the past"
   else
-    $newstore.store(event.channel.name, id, Event.new(id, name, time))
+    store = ServerEventStore.new($base_dir, event.server.name)
+    store.store(event.channel.name, id, Event.new(id, name, time))
     event.respond "New event #{name} scheduled for #{time}"
   end
 end
 
 def handle_list(event, args)
-  event.respond $newstore.list(event.channel.name)
+  store = ServerEventStore.new($base_dir, event.server.name)
+  event.respond store.list(event.channel.name)
 end
 
 def handle_yes(event, args)
-  handle_missing(event, args) do |scheduled|
+  handle_missing(event, args) do |store, scheduled|
     scheduled.accept(event.user)
-    $newstore.store(event.channel.name, scheduled.id, scheduled)
+    store.store(event.channel.name, scheduled.id, scheduled)
     nil
   end
 end
 
 def handle_no(event, args)
-  handle_missing(event, args) do |scheduled|
+  handle_missing(event, args) do |store, scheduled|
     scheduled.decline(event.user)
-    $newstore.store(event.channel.name, scheduled.id, scheduled)
+    store.store(event.channel.name, scheduled.id, scheduled)
     nil
   end
 end
 
 def handle_maybe(event, args)
-  handle_missing(event, args) do |scheduled|
+  handle_missing(event, args) do |store, scheduled|
     scheduled.maybe(event.user)
-    $newstore.store(event.channel.name, scheduled.id, scheduled)
+    store.store(event.channel.name, scheduled.id, scheduled)
     nil
   end
 end
 
 def handle_delete(event, args)
-  handle_missing(event, args) do |scheduled|
-    $newstore.delete(event.channel.name, scheduled.id)
+  handle_missing(event, args) do |store, scheduled|
+    store.delete(event.channel.name, scheduled.id)
     nil
   end
 end
 
 def handle_responses(event, args)
-  handle_missing(event, args) do |scheduled|
-    puts "Responses for event: #{scheduled}"
+  handle_missing(event, args) do |store, scheduled|
     scheduled.responses
   end
 end
 
 def handle_missing(event, args, &block)
   event_id = args[1]
-  scheduled = $newstore.retrieve(event.channel.name, event_id)
+  store = ServerEventStore.new($base_dir, event.server.name)
+  scheduled = store.retrieve(event.channel.name, event_id)
   if scheduled
-    event.respond block[scheduled]
+    event.respond block[store, scheduled]
   else
     event.respond "No event found with id #{event_id}"
   end
