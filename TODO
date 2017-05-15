@@ -1,3 +1,3 @@
-- persist to disk
-- change UUIDs to itegers - more usable
 - fix bug !sched create event "name with whitespace" 2017-06-27 14:00
+- config file for token and client id
+- logging
