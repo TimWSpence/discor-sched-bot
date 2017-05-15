@@ -28,4 +28,4 @@ bundle install
 ruby bot.rb
 ```
 
-Note that you should edit your client id and token, as per https://discordapp.com/developers/applications/me
+Note that you have to edit your client id and token in a file called config.yml, as per https://discordapp.com/developers/applications/me
